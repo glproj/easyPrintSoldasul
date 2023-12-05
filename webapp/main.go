@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 	"strconv"
 	"time"
 
@@ -37,16 +38,54 @@ func updateRow(orderNumber int, businessName string, orderType string, file *exc
 	}
 	return nil
 }
-func main() {
-	f, err := excelize.OpenFile("test.xlsx")
+func updateHandler(c *gin.Context) {
+	fileName := c.Query("fileName")
+	if fileName == "" {
+		fileName = "test.xlsx"
+	}
+	f, err := excelize.OpenFile(fileName)
 	if err != nil {
-		fmt.Println(err)
+		c.JSON(http.StatusInternalServerError, "Could not open file: "+err.Error())
+		return
 	}
 	defer func() {
 		if err := f.Close(); err != nil {
 			fmt.Println(err)
+			return
 		}
 	}()
-
-	fmt.Println("bruh")
+	if c.Query("orderNumber") == "" {
+		c.JSON(http.StatusInternalServerError, "Please enter orderNumber query.")
+		return
+	}
+	orderNumber, err := strconv.Atoi(c.Query("orderNumber"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, "Could not convert orderNumber to int: "+err.Error())
+		return
+	}
+	businessName := c.Query("businessName")
+	orderType := c.Query("orderType")
+	if businessName == "" {
+		c.JSON(http.StatusInternalServerError, "Please enter businessName query.")
+		return
+	}
+	if orderType == "" {
+		c.JSON(http.StatusInternalServerError, "Please enter orderType query.")
+		return
+	}
+	err = updateRow(orderNumber, businessName, orderType, f)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, "Could not update row: "+err.Error())
+		return
+	}
+	if err := f.SaveAs(fileName); err != nil {
+		c.JSON(http.StatusInternalServerError, "Could not save file: "+err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, "success!")
+}
+func main() {
+	router := gin.Default()
+	router.GET("/update", updateHandler)
+	router.Run(":8080")
 }
