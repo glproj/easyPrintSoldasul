@@ -10,12 +10,26 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
-func updateRow(orderNumber int, businessName string, orderType string, file *excelize.File) error {
+type IsDuplicate struct {
+	orderNumberStr string
+}
+
+func (e *IsDuplicate) Error() string {
+	return "Found another row with " + e.orderNumberStr + " as its order number."
+}
 	orderNumberStr := strconv.Itoa(orderNumber)
 	sheet := file.GetSheetList()[0]
 	rows, err := file.GetRows(sheet)
 	if err != nil {
 		return err
+	}
+	if checkForDuplicate {
+		for _, row := range rows {
+			otherOrderNumber := row[0]
+			if orderNumberStr == otherOrderNumber {
+				return &IsDuplicate{orderNumberStr: orderNumberStr}
+			}
+		}
 	}
 	firstEmptyRowIndex := strconv.Itoa(len(rows) + 1)
 	err = file.SetCellValue(sheet, "A"+firstEmptyRowIndex, orderNumberStr)
