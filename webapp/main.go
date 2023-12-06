@@ -17,6 +17,7 @@ type IsDuplicate struct {
 func (e *IsDuplicate) Error() string {
 	return "Found another row with " + e.orderNumberStr + " as its order number."
 }
+func updateRow(orderNumber int, businessName string, orderType string, file *excelize.File, checkForDuplicate bool) error {
 	orderNumberStr := strconv.Itoa(orderNumber)
 	sheet := file.GetSheetList()[0]
 	rows, err := file.GetRows(sheet)
@@ -87,7 +88,8 @@ func updateHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, "Please enter orderType query.")
 		return
 	}
-	err = updateRow(orderNumber, businessName, orderType, f)
+	checkForDuplicate := c.Query("checkForDuplicate")
+	err = updateRow(orderNumber, businessName, orderType, f, !(checkForDuplicate == ""))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, "Could not update row: "+err.Error())
 		return
@@ -98,8 +100,24 @@ func updateHandler(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, "success!")
 }
+func CORSMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+
+		c.Next()
+	}
+}
 func main() {
 	router := gin.Default()
+	router.Use(CORSMiddleware())
 	router.GET("/update", updateHandler)
 	router.Run(":8080")
 }
